@@ -5,8 +5,10 @@ from __future__ import absolute_import
 from six import string_types
 
 from cobra.io.dict import model_from_dict, model_to_dict
+from cobra.io.json_schemas.json_schema_v1 import json_schema_V1
+from cobra.io.json_schemas.json_schema_v2 import json_schema_V2
 
-
+import jsonschema
 try:
     import simplejson as json
 except ImportError:
@@ -136,3 +138,47 @@ def load_json_model(filename):
             return model_from_dict(json.load(file_handle))
     else:
         return model_from_dict(json.load(filename))
+
+
+def validate_json_model(filename, json_schema_version=1):
+    """
+    Validate a model in json format against the schema with given version
+
+    Parameters
+    ----------
+    filename : str or file-like
+        File path or descriptor that contains the JSON document describing the
+        cobra model.
+    json_schema_version : int {1, 2}
+        the version of schema to be used for validation.
+        Currently we have v1 and v2 only and v2 is under development
+
+    Returns
+    -------
+    (boolean, error)
+    boolean :
+        True if json instance is valid against the schema, False otherwise
+    errors : str
+        Error encountered while validating
+    """
+
+    if json_schema_version not in [1, 2]:
+        return (False, "Incorrect version passed for JSON schema. COBRApy "
+                       "only supports v1 and v2 of JSON schema")
+
+    schema = {}
+    if json_schema_version is 1:
+        schema = json_schema_V1
+    else:
+        schema = json_schema_V2
+
+    try:
+        if isinstance(filename, string_types):
+            with open(filename, "r") as file_handle:
+                jsonschema.validate(json.load(file_handle), schema)
+        else:
+            jsonschema.validate(json.load(filename), schema)
+    except Exception as e:
+        return (False, str(e))
+
+    return (True, "")
