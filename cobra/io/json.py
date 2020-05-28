@@ -166,10 +166,9 @@ def validate_json_model(filename, json_schema_version=1):
         return (False, "Incorrect version passed for JSON schema. COBRApy "
                        "only supports v1 and v2 of JSON schema")
 
-    schema = {}
-    if json_schema_version is 1:
+    if json_schema_version == 1:
         schema = json_schema_V1
-    else:
+    elif json_schema_version == 2:
         schema = json_schema_V2
 
     try:
@@ -179,6 +178,6 @@ def validate_json_model(filename, json_schema_version=1):
         else:
             jsonschema.validate(json.load(filename), schema)
     except Exception as e:
-        return (False, str(e))
+        return False, str(e)
 
-    return (True, "")
+    return True, ""

@@ -2,6 +2,7 @@
 
 """Test functionalities of json.py"""
 
+# FIXME: remove unnecessary py2 compatibility
 from __future__ import absolute_import
 
 import json
