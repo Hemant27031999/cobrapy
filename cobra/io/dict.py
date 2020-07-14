@@ -9,7 +9,7 @@ from operator import attrgetter, itemgetter
 from numpy import bool_, float_
 from six import iteritems, string_types
 
-from cobra.core import Gene, Metabolite, Model, Reaction
+from cobra.core import Gene, Metabolite, Model, Reaction, Group
 from cobra.core.metadata import MetaData, Notes
 from cobra.util.solver import set_objective
 
@@ -41,6 +41,13 @@ _OPTIONAL_METABOLITE_ATTRIBUTES = {
 _REQUIRED_GENE_ATTRIBUTES = ["id", "name"]
 _ORDERED_OPTIONAL_GENE_KEYS = ["notes", "annotation"]
 _OPTIONAL_GENE_ATTRIBUTES = {
+    "notes": {},
+    "annotation": {},
+}
+
+_REQUIRED_GROUP_ATTRIBUTES = ["id", "name", "kind", "members"]
+_ORDERED_OPTIONAL_GROUP_KEYS = ["notes", "annotation"]
+_OPTIONAL_GROUP_ATTRIBUTES = {
     "notes": {},
     "annotation": {},
 }
@@ -208,6 +215,49 @@ def reaction_from_dict(reaction, model):
     return new_reaction
 
 
+def group_to_dict(group):
+    new_group = OrderedDict()
+    for key in _REQUIRED_GROUP_ATTRIBUTES:
+        if key != "members":
+            new_group[key] = _fix_type(getattr(group, key))
+            continue
+        members = []
+        for member in group.members:
+            json_member = {"id": member.id, "type": type(member).__name__}
+            members.append(json_member)
+        new_group["members"] = members
+    _update_optional(group, new_group, _OPTIONAL_GROUP_ATTRIBUTES,
+                     _ORDERED_OPTIONAL_GROUP_KEYS)
+    return new_group
+
+
+def group_from_dict(group, model):
+    new_group = Group()
+    for k, v in iteritems(group):
+        if k == "annotation":
+            value = _extract_annotation(v)
+            setattr(new_group, k, value)
+        elif k == "notes":
+            notes_data = Notes(v)
+            setattr(new_group, k, notes_data)
+        elif k == "members":
+            cobra_members = []
+            for member in group["members"]:
+                if member["type"] == "Reaction":
+                    cobra_obj = model.reactions.get_by_id(member["id"])
+                    cobra_members.append(cobra_obj)
+                elif member["type"] == "Metabolite":
+                    cobra_obj = model.metabolites.get_by_id(member["id"])
+                    cobra_members.append(cobra_obj)
+                elif member["type"] == "Gene":
+                    cobra_obj = model.genes.get_by_id(member["id"])
+                    cobra_members.append(cobra_obj)
+            new_group.add_members(cobra_members)
+        else:
+            setattr(new_group, k, v)
+    return new_group
+
+
 def model_to_dict(model, sort=False):
     """Convert model to a dict.
 
@@ -235,6 +285,7 @@ def model_to_dict(model, sort=False):
     obj["metabolites"] = list(map(metabolite_to_dict, model.metabolites))
     obj["reactions"] = list(map(reaction_to_dict, model.reactions))
     obj["genes"] = list(map(gene_to_dict, model.genes))
+    obj["groups"] = list(map(group_to_dict, model.groups))
     obj["id"] = model.id
     _update_optional(model, obj, _OPTIONAL_MODEL_ATTRIBUTES,
                      _ORDERED_OPTIONAL_MODEL_KEYS)
@@ -243,6 +294,7 @@ def model_to_dict(model, sort=False):
         obj["metabolites"].sort(key=get_id)
         obj["reactions"].sort(key=get_id)
         obj["genes"].sort(key=get_id)
+        obj["groups"].sort(key=get_id)
     return obj
 
 
@@ -279,6 +331,10 @@ def model_from_dict(obj):
     model.add_reactions(
         [reaction_from_dict(reaction, model) for reaction in obj['reactions']]
     )
+    if 'groups' in obj:
+        model.add_groups(
+            [group_from_dict(group, model) for group in obj['groups']]
+        )
     objective_reactions = [rxn for rxn in obj['reactions'] if
                            rxn.get('objective_coefficient', 0) != 0]
     coefficients = {

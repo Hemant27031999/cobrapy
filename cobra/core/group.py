@@ -45,7 +45,7 @@ class Group(Object):
     """
     KIND_TYPES = ("collection", "classification", "partonomy")
 
-    def __init__(self, id, name='', members=None, kind=None):
+    def __init__(self, id=None, name='', members=None, kind=None):
         Object.__init__(self, id, name)
 
         self._members = DictList() if members is None else DictList(members)
